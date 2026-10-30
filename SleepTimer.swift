@@ -9,7 +9,7 @@ enum EndAction: String, CaseIterable, Identifiable {
 
 // Accent taken from the "Parasomnia" cover: cold moonlight on teal-grey walls.
 extension Color {
-    static let moonlight = Color(red: 0.29, green: 0.48, blue: 0.52)
+    static let moonlight = Color(red: 0.33, green: 0.56, blue: 0.60)
 }
 
 @MainActor
@@ -161,20 +161,61 @@ func format(_ t: TimeInterval) -> String {
 
 extension View {
     /// Liquid Glass on macOS 26+, bordered buttons before that.
-    @ViewBuilder func glassButton(prominent: Bool = false) -> some View {
-        if #available(macOS 26, *) {
-            if prominent { buttonStyle(.glassProminent) } else { buttonStyle(.glass) }
-        } else {
-            if prominent { buttonStyle(.borderedProminent) } else { buttonStyle(.bordered) }
-        }
+    @ViewBuilder func glassButton() -> some View {
+        if #available(macOS 26, *) { buttonStyle(.glass) } else { buttonStyle(.bordered) }
     }
 
-    @ViewBuilder func glassGroup(spacing: CGFloat) -> some View {
+    /// Control Center-style module background.
+    @ViewBuilder func tile(cornerRadius: CGFloat = 18, interactive: Bool = false) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(macOS 26, *) {
-            GlassEffectContainer(spacing: spacing) { self }
+            glassEffect(interactive ? .regular.interactive() : .regular, in: shape)
         } else {
-            self
+            background(.thinMaterial, in: shape)
+                .overlay(shape.strokeBorder(.white.opacity(0.08)))
         }
+    }
+}
+
+/// Round icon like the ones in Control Center modules; filled with the accent when on.
+struct Badge: View {
+    let symbol: String
+    var on = false
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(on ? Color.white : Color.primary)
+            .frame(width: 30, height: 30)
+            .background(Circle().fill(on ? Color.moonlight : Color.primary.opacity(0.12)))
+    }
+}
+
+/// A tappable module: badge + title + subtitle.
+struct ModuleButton: View {
+    let symbol: String
+    let title: String
+    var subtitle: String? = nil
+    var on = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Badge(symbol: symbol, on: on)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title).font(.system(size: 12, weight: .semibold))
+                    if let subtitle {
+                        Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .tile(interactive: true)
     }
 }
 
@@ -183,29 +224,27 @@ struct ContentView: View {
     private let presets = [15, 30, 45, 60, 90, 120]
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 10) {
             HStack(spacing: 10) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .frame(width: 30, height: 30)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("PARASOMNIA")
-                        .font(.system(size: 15, weight: .light))
+                        .font(.system(size: 14, weight: .light))
                         .tracking(4)
                     Text(model.isRunning ? "Timer running" : "Sleep timer")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button {
-                    NSApp.terminate(nil)
-                } label: {
-                    Image(systemName: "power")
-                }
-                .glassButton()
-                .buttonBorderShape(.circle)
-                .help("Quit Parasomnia")
-                .keyboardShortcut("q")
+                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
+                    .glassButton()
+                    .buttonBorderShape(.circle)
+                    .help("Quit Parasomnia")
+                    .keyboardShortcut("q")
             }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 2)
 
             if let r = model.remaining {
                 running(r)
@@ -220,118 +259,130 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(16)
+        .padding(12)
         .frame(width: 300)
         .tint(.moonlight)
     }
 
     private func running(_ r: TimeInterval) -> some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             VStack(spacing: 2) {
                 Text(format(r))
-                    .font(.system(size: 52, weight: .thin, design: .rounded).monospacedDigit())
+                    .font(.system(size: 50, weight: .thin, design: .rounded).monospacedDigit())
                     .contentTransition(.numericText(countsDown: true))
                     .animation(.default, value: Int(r))
                 Text(model.action == .shutdown ? "until your Mac shuts down" : "until your Mac sleeps")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
                 if let w = model.scheduledWake {
                     Label("Wakes \(w.formatted(date: .abbreviated, time: .shortened))", systemImage: "sunrise")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .padding(.top, 4)
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .padding(.top, 2)
                 }
             }
             .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .tile()
 
-            HStack(spacing: 8) {
-                Button { model.extend(by: 5) } label: { Text("+5 min").frame(maxWidth: .infinity) }
-                    .glassButton()
-                Button { model.extend(by: 15) } label: { Text("+15 min").frame(maxWidth: .infinity) }
-                    .glassButton()
-                Button { model.cancel() } label: { Text("Cancel").frame(maxWidth: .infinity) }
-                    .glassButton(prominent: true)
-                    .keyboardShortcut(.cancelAction)
+            HStack(spacing: 10) {
+                ModuleButton(symbol: "plus", title: "5 min", subtitle: "Extend") { model.extend(by: 5) }
+                ModuleButton(symbol: "plus", title: "15 min", subtitle: "Extend") { model.extend(by: 15) }
             }
-            .controlSize(.large)
-            .glassGroup(spacing: 8)
+
+            ModuleButton(symbol: "stop.fill", title: "Cancel", subtitle: "Keep your Mac on", on: true) { model.cancel() }
+                .keyboardShortcut(.cancelAction)
         }
     }
 
     private var setup: some View {
-        VStack(spacing: 14) {
-            // Big duration readout with − / + around it.
+        VStack(spacing: 10) {
             HStack {
                 Button { model.minutes = max(5, model.minutes - 5) } label: {
-                    Image(systemName: "minus").frame(width: 20, height: 20)
+                    Image(systemName: "minus").frame(width: 18, height: 18)
                 }
                 .glassButton()
                 .buttonBorderShape(.circle)
                 Spacer()
                 VStack(spacing: 0) {
                     Text("\(model.minutes)")
-                        .font(.system(size: 52, weight: .thin, design: .rounded).monospacedDigit())
+                        .font(.system(size: 50, weight: .thin, design: .rounded).monospacedDigit())
                         .contentTransition(.numericText())
                         .animation(.snappy, value: model.minutes)
-                    Text("minutes").font(.subheadline).foregroundStyle(.secondary)
+                    Text("minutes").font(.system(size: 11)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { model.minutes = min(600, model.minutes + 5) } label: {
-                    Image(systemName: "plus").frame(width: 20, height: 20)
+                    Image(systemName: "plus").frame(width: 18, height: 18)
                 }
                 .glassButton()
                 .buttonBorderShape(.circle)
             }
             .controlSize(.large)
+            .padding(12)
+            .tile()
 
-            // Presets: two even rows of three.
             Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                 ForEach(0..<2) { row in
                     GridRow {
                         ForEach(presets[row * 3 ..< row * 3 + 3], id: \.self) { p in
-                            Button { model.minutes = p } label: {
-                                Text(p < 60 ? "\(p) min" : p % 60 == 0 ? "\(p / 60) h" : "\(p / 60) h \(p % 60)")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .glassButton(prominent: model.minutes == p)
+                            presetButton(p)
                         }
                     }
                 }
             }
-            .glassGroup(spacing: 8)
 
-            Divider()
+            HStack(spacing: 10) {
+                ModuleButton(symbol: "power", title: "Shut Down", subtitle: "Power off",
+                             on: model.action == .shutdown) { model.action = .shutdown }
+                ModuleButton(symbol: "moon.zzz.fill", title: "Sleep", subtitle: "Keep apps",
+                             on: model.action == .sleep) { model.action = .sleep }
+            }
 
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                    Text("When done")
-                    Picker("", selection: $model.action) {
-                        ForEach(EndAction.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
+            HStack(spacing: 8) {
+                Button { model.wakeEnabled.toggle() } label: {
+                    Badge(symbol: "sunrise.fill", on: model.wakeEnabled)
+                }
+                .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Wake Me").font(.system(size: 12, weight: .semibold))
+                    Text(model.wakeEnabled ? "In the morning" : "Off")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                DatePicker("", selection: $model.wakeTime, displayedComponents: .hourAndMinute)
                     .labelsHidden()
-                }
-                GridRow {
-                    Text("Wake me at")
-                    HStack {
-                        DatePicker("", selection: $model.wakeTime, displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .disabled(!model.wakeEnabled)
-                        Spacer()
-                        Toggle("", isOn: $model.wakeEnabled)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                    }
-                }
+                    .disabled(!model.wakeEnabled)
             }
+            .padding(10)
+            .tile()
 
-            Button {
-                model.start()
-            } label: {
-                Text("Start").frame(maxWidth: .infinity)
-            }
-            .glassButton(prominent: true)
-            .controlSize(.large)
-            .keyboardShortcut(.defaultAction)
+            ModuleButton(symbol: "play.fill", title: "Start",
+                         subtitle: "\(model.minutes) min, then \(model.action == .shutdown ? "shut down" : "sleep")",
+                         on: true) { model.start() }
+                .keyboardShortcut(.defaultAction)
         }
+    }
+
+    private func presetButton(_ p: Int) -> some View {
+        let selected = model.minutes == p
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return Button { model.minutes = p } label: {
+            Text(p < 60 ? "\(p) min" : p % 60 == 0 ? "\(p / 60) h" : "\(p / 60) h \(p % 60)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(selected ? Color.black : Color.primary)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .background { if selected { shape.fill(.white) } }
+        .modifier(PresetGlass(selected: selected))
+    }
+}
+
+/// Unselected presets are glass; the selected one is solid white, like an "on" Control Center toggle.
+struct PresetGlass: ViewModifier {
+    let selected: Bool
+    func body(content: Content) -> some View {
+        if selected { content } else { content.tile(cornerRadius: 12, interactive: true) }
     }
 }
 
