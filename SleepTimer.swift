@@ -7,18 +7,9 @@ enum EndAction: String, CaseIterable, Identifiable {
     var title: String { self == .shutdown ? "Shut Down" : "Sleep" }
 }
 
-// Palette taken from "Images and Words": night window, crimson canopy, gilded trim.
-enum Theme {
-    static let night = Color(red: 0.06, green: 0.08, blue: 0.16)
-    static let wine = Color(red: 0.29, green: 0.05, blue: 0.07)
-    static let crimson = Color(red: 0.56, green: 0.11, blue: 0.12)
-    static let gold = Color(red: 0.85, green: 0.66, blue: 0.27)
-    static let paleGold = Color(red: 0.95, green: 0.83, blue: 0.54)
-    static let ivory = Color(red: 0.95, green: 0.90, blue: 0.78)
-    static let flame = Color(red: 1.0, green: 0.62, blue: 0.22)
-
-    static func title(_ size: CGFloat) -> Font { .custom("Copperplate", size: size) }
-    static func serif(_ size: CGFloat) -> Font { .custom("Didot", size: size) }
+// Accent taken from the "Images and Words" canopy.
+extension Color {
+    static let canopy = Color(red: 0.66, green: 0.12, blue: 0.14)
 }
 
 @MainActor
@@ -168,57 +159,24 @@ func format(_ t: TimeInterval) -> String {
     return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%02d:%02d", m, sec)
 }
 
-struct GildedButtonStyle: ButtonStyle {
-    enum Kind { case primary, outline, selected }
-    var kind: Kind = .outline
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.title(kind == .primary ? 15 : 12))
-            .tracking(1)
-            .foregroundStyle(kind == .selected ? Theme.night : (kind == .primary ? Theme.ivory : Theme.paleGold))
-            .padding(.vertical, kind == .primary ? 9 : 6)
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 6).fill(
-                    kind == .primary
-                        ? AnyShapeStyle(LinearGradient(colors: [Theme.crimson, Theme.wine], startPoint: .top, endPoint: .bottom))
-                        : kind == .selected ? AnyShapeStyle(Theme.gold) : AnyShapeStyle(Color.black.opacity(0.25))
-                )
-            )
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.gold.opacity(kind == .outline ? 0.55 : 0.9), lineWidth: 1))
-            .opacity(configuration.isPressed ? 0.7 : 1)
-            .contentShape(Rectangle())
-    }
-}
-
-struct Ornament: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            Rectangle().fill(LinearGradient(colors: [.clear, Theme.gold], startPoint: .leading, endPoint: .trailing)).frame(height: 0.8)
-            Image(systemName: "moon.fill").font(.system(size: 9)).foregroundStyle(Theme.gold)
-            Rectangle().fill(LinearGradient(colors: [Theme.gold, .clear], startPoint: .leading, endPoint: .trailing)).frame(height: 0.8)
-        }
-    }
-}
-
 struct ContentView: View {
     @EnvironmentObject var model: TimerModel
-    private let presets = [15, 30, 45, 60, 90, 120]
+    private let presets = [15, 30, 45, 60, 90]
 
     var body: some View {
-        VStack(spacing: 14) {
-            VStack(spacing: 2) {
-                Text("THE MIRACLE")
-                Text("AND THE SLEEPER")
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 32, height: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("The Miracle and the Sleeper").font(.headline)
+                    Text(model.isRunning ? "Timer running" : "Sleep timer")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
             }
-            .font(Theme.title(17))
-            .tracking(2)
-            .foregroundStyle(LinearGradient(colors: [Theme.paleGold, Theme.gold], startPoint: .top, endPoint: .bottom))
-            .shadow(color: Theme.flame.opacity(0.4), radius: 6)
 
-            Ornament()
+            Divider()
 
             if let r = model.remaining {
                 running(r)
@@ -227,97 +185,103 @@ struct ContentView: View {
             }
 
             if let e = model.errorText {
-                Text(e).font(.caption).foregroundStyle(Theme.flame).fixedSize(horizontal: false, vertical: true)
+                Label(e, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Button("Quit") { NSApp.terminate(nil) }
+            Divider()
+
+            Button("Quit The Miracle and the Sleeper") { NSApp.terminate(nil) }
                 .buttonStyle(.plain)
-                .font(Theme.serif(12).italic())
-                .foregroundStyle(Theme.gold.opacity(0.7))
+                .foregroundStyle(.secondary)
+                .keyboardShortcut("q")
         }
-        .padding(18)
-        .frame(width: 280)
-        .background(background)
-        .tint(Theme.gold)
-        .environment(\.colorScheme, .dark)
+        .padding(16)
+        .frame(width: 300)
+        .tint(.canopy)
     }
 
     private func running(_ r: TimeInterval) -> some View {
-        VStack(spacing: 10) {
-            Text(format(r))
-                .font(Theme.serif(52).monospacedDigit())
-                .foregroundStyle(Theme.ivory)
-                .shadow(color: Theme.flame.opacity(0.5), radius: 10)
-            Text(model.action == .shutdown ? "until the Mac shuts down" : "until the Mac sleeps")
-                .font(Theme.serif(13).italic()).foregroundStyle(Theme.paleGold.opacity(0.85))
-            if let w = model.scheduledWake {
-                Label("Wakes \(w.formatted(date: .abbreviated, time: .shortened))", systemImage: "sun.horizon")
-                    .font(Theme.serif(13)).foregroundStyle(Theme.paleGold.opacity(0.85))
+        VStack(spacing: 12) {
+            VStack(spacing: 2) {
+                Text(format(r))
+                    .font(.system(size: 48, weight: .semibold, design: .rounded).monospacedDigit())
+                    .contentTransition(.numericText(countsDown: true))
+                    .animation(.default, value: Int(r))
+                Text(model.action == .shutdown ? "until your Mac shuts down" : "until your Mac sleeps")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                if let w = model.scheduledWake {
+                    Label("Wakes \(w.formatted(date: .abbreviated, time: .shortened))", systemImage: "sunrise")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                }
             }
-            HStack(spacing: 8) {
-                Button("+5 MIN") { model.extend(by: 5) }.buttonStyle(GildedButtonStyle())
-                Button("+15 MIN") { model.extend(by: 15) }.buttonStyle(GildedButtonStyle())
+            .frame(maxWidth: .infinity)
+
+            HStack {
+                Button("+5 min") { model.extend(by: 5) }.buttonStyle(.bordered)
+                Button("+15 min") { model.extend(by: 15) }.buttonStyle(.bordered)
+                Spacer()
+                Button("Cancel") { model.cancel() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.cancelAction)
             }
-            Button("CANCEL") { model.cancel() }
-                .buttonStyle(GildedButtonStyle(kind: .primary))
-                .keyboardShortcut(.cancelAction)
+            .controlSize(.large)
         }
     }
 
     private var setup: some View {
-        VStack(spacing: 12) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                ForEach(presets, id: \.self) { p in
-                    Button("\(p) MIN") { model.minutes = p }
-                        .buttonStyle(GildedButtonStyle(kind: model.minutes == p ? .selected : .outline))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("Duration", selection: $model.minutes) {
+                ForEach(presets, id: \.self) { Text("\($0)").tag($0) }
             }
-            HStack {
-                Text("Duration").font(Theme.serif(14))
-                Spacer()
-                TextField("", value: $model.minutes, format: .number)
-                    .textFieldStyle(.plain)
-                    .font(Theme.serif(16).monospacedDigit())
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 44)
-                Text("min").font(Theme.serif(14).italic())
-                Stepper("", value: $model.minutes, in: 1...600, step: 5).labelsHidden()
-            }
-            .foregroundStyle(Theme.ivory)
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
-            HStack(spacing: 8) {
-                ForEach(EndAction.allCases) { a in
-                    Button(a.title.uppercased()) { model.action = a }
-                        .buttonStyle(GildedButtonStyle(kind: model.action == a ? .selected : .outline))
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text("Duration").gridColumnAlignment(.trailing)
+                    HStack(spacing: 4) {
+                        TextField("", value: $model.minutes, format: .number)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 48)
+                        Stepper("", value: $model.minutes, in: 1...600, step: 5).labelsHidden()
+                        Text("min").foregroundStyle(.secondary)
+                    }
                 }
-            }
-
-            HStack {
-                Toggle(isOn: $model.wakeEnabled) {
-                    Text("Wake me at").font(Theme.serif(14))
-                }
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                Spacer()
-                DatePicker("", selection: $model.wakeTime, displayedComponents: .hourAndMinute)
+                GridRow {
+                    Text("When done")
+                    Picker("", selection: $model.action) {
+                        ForEach(EndAction.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
                     .labelsHidden()
-                    .disabled(!model.wakeEnabled)
+                    .fixedSize()
+                }
+                GridRow {
+                    Text("Wake me at")
+                    HStack {
+                        DatePicker("", selection: $model.wakeTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                            .disabled(!model.wakeEnabled)
+                        Spacer()
+                        Toggle("", isOn: $model.wakeEnabled)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
+                }
             }
-            .foregroundStyle(Theme.ivory)
 
-            Button("BEGIN") { model.start() }
-                .buttonStyle(GildedButtonStyle(kind: .primary))
-                .keyboardShortcut(.defaultAction)
-        }
-    }
-
-    private var background: some View {
-        ZStack {
-            LinearGradient(colors: [Theme.night, Theme.wine], startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [Theme.flame.opacity(0.28), .clear], center: .topLeading, startRadius: 0, endRadius: 260)
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Theme.gold.opacity(0.5), lineWidth: 1)
-                .padding(5)
+            Button {
+                model.start()
+            } label: {
+                Text("Start").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
         }
     }
 }
