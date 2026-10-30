@@ -13,9 +13,20 @@ Themed after Dream Theater's *Images and Words*.
 - Optional "Wake me at" — schedules a morning wake via `pmset` (asks for your admin password)
 - If the Mac fell asleep on its own and wakes after the deadline, the timer is dropped instead of shutting down
 
+## Download
+
+Grab `The-Miracle-and-the-Sleeper.zip` from the [latest release](https://github.com/cihancinar77/the-miracle-and-the-sleeper/releases/latest), unzip, and drag the app to Applications. Requires macOS 13+ (Apple Silicon or Intel).
+
+The app isn't notarized, so macOS blocks it on first launch. Either:
+
+- Try to open it once, then go to System Settings › Privacy & Security and click **Open Anyway**, or
+- Run `xattr -dr com.apple.quarantine "/Applications/The Miracle and the Sleeper.app"`
+
+It lives in the menu bar (moon icon) — there's no Dock icon.
+
 ## Build
 
-Requires Xcode command line tools, macOS 13+, Apple Silicon.
+Requires Xcode command line tools and macOS 13+.
 
 ```sh
 ./build.sh
