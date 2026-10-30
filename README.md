@@ -1,8 +1,8 @@
-# The Miracle and the Sleeper
+# Parasomnia
 
 A tiny native macOS menu bar sleep timer. Fall asleep to YouTube — when the countdown ends, your Mac shuts down (or sleeps), and can optionally wake again in the morning.
 
-Themed after Dream Theater's *Images and Words*.
+Named after Dream Theater's *Parasomnia*; Liquid Glass UI with a moonlit teal accent from its cover.
 
 ## Features
 
@@ -15,22 +15,22 @@ Themed after Dream Theater's *Images and Words*.
 
 ## Download
 
-Grab `The-Miracle-and-the-Sleeper.zip` from the [latest release](https://github.com/cihancinar77/the-miracle-and-the-sleeper/releases/latest), unzip, and drag the app to Applications. Requires macOS 13+ (Apple Silicon or Intel).
+Grab `Parasomnia.zip` from the [latest release](https://github.com/cihancinar77/the-miracle-and-the-sleeper/releases/latest), unzip, and drag the app to Applications. Requires macOS 14+ (Apple Silicon or Intel).
 
 The app isn't notarized, so macOS blocks it on first launch. Either:
 
 - Try to open it once, then go to System Settings › Privacy & Security and click **Open Anyway**, or
-- Run `xattr -dr com.apple.quarantine "/Applications/The Miracle and the Sleeper.app"`
+- Run `xattr -dr com.apple.quarantine "/Applications/Parasomnia.app"`
 
 It lives in the menu bar (moon icon) — there's no Dock icon.
 
 ## Build
 
-Requires Xcode command line tools and macOS 13+.
+Requires Xcode command line tools and macOS 14+.
 
 ```sh
 ./build.sh
-open "The Miracle and the Sleeper.app"
+open "Parasomnia.app"
 ```
 
 On the first **Begin** with Shut Down selected, macOS asks to allow controlling System Events — allow it (System Settings › Privacy & Security › Automation).

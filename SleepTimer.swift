@@ -7,9 +7,9 @@ enum EndAction: String, CaseIterable, Identifiable {
     var title: String { self == .shutdown ? "Shut Down" : "Sleep" }
 }
 
-// Accent taken from the "Images and Words" canopy.
+// Accent taken from the "Parasomnia" cover: cold moonlight on teal-grey walls.
 extension Color {
-    static let canopy = Color(red: 0.66, green: 0.12, blue: 0.14)
+    static let moonlight = Color(red: 0.29, green: 0.48, blue: 0.52)
 }
 
 @MainActor
@@ -146,7 +146,7 @@ final class TimerModel: ObservableObject {
         var error: NSDictionary?
         NSAppleScript(source: source)?.executeAndReturnError(&error)
         if let error {
-            errorText = "Permission needed: System Settings › Privacy & Security › Automation › The Miracle and the Sleeper. (\(error[NSAppleScript.errorNumber] ?? "?"))"
+            errorText = "Permission needed: System Settings › Privacy & Security › Automation › Parasomnia. (\(error[NSAppleScript.errorNumber] ?? "?"))"
             return false
         }
         return true
@@ -159,24 +159,53 @@ func format(_ t: TimeInterval) -> String {
     return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%02d:%02d", m, sec)
 }
 
+extension View {
+    /// Liquid Glass on macOS 26+, bordered buttons before that.
+    @ViewBuilder func glassButton(prominent: Bool = false) -> some View {
+        if #available(macOS 26, *) {
+            if prominent { buttonStyle(.glassProminent) } else { buttonStyle(.glass) }
+        } else {
+            if prominent { buttonStyle(.borderedProminent) } else { buttonStyle(.bordered) }
+        }
+    }
+
+    @ViewBuilder func glassGroup(spacing: CGFloat) -> some View {
+        if #available(macOS 26, *) {
+            GlassEffectContainer(spacing: spacing) { self }
+        } else {
+            self
+        }
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject var model: TimerModel
-    private let presets = [15, 30, 45, 60, 90]
+    private let presets = [15, 30, 45, 60, 90, 120]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(spacing: 16) {
             HStack(spacing: 10) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
-                    .frame(width: 32, height: 32)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("The Miracle and the Sleeper").font(.headline)
+                    .frame(width: 30, height: 30)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("PARASOMNIA")
+                        .font(.system(size: 15, weight: .light))
+                        .tracking(4)
                     Text(model.isRunning ? "Timer running" : "Sleep timer")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
+                Spacer()
+                Button {
+                    NSApp.terminate(nil)
+                } label: {
+                    Image(systemName: "power")
+                }
+                .glassButton()
+                .buttonBorderShape(.circle)
+                .help("Quit Parasomnia")
+                .keyboardShortcut("q")
             }
-
-            Divider()
 
             if let r = model.remaining {
                 running(r)
@@ -190,24 +219,17 @@ struct ContentView: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            Divider()
-
-            Button("Quit The Miracle and the Sleeper") { NSApp.terminate(nil) }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .keyboardShortcut("q")
         }
         .padding(16)
         .frame(width: 300)
-        .tint(.canopy)
+        .tint(.moonlight)
     }
 
     private func running(_ r: TimeInterval) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             VStack(spacing: 2) {
                 Text(format(r))
-                    .font(.system(size: 48, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 52, weight: .thin, design: .rounded).monospacedDigit())
                     .contentTransition(.numericText(countsDown: true))
                     .animation(.default, value: Int(r))
                 Text(model.action == .shutdown ? "until your Mac shuts down" : "until your Mac sleeps")
@@ -220,37 +242,65 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity)
 
-            HStack {
-                Button("+5 min") { model.extend(by: 5) }.buttonStyle(.bordered)
-                Button("+15 min") { model.extend(by: 15) }.buttonStyle(.bordered)
-                Spacer()
-                Button("Cancel") { model.cancel() }
-                    .buttonStyle(.borderedProminent)
+            HStack(spacing: 8) {
+                Button { model.extend(by: 5) } label: { Text("+5 min").frame(maxWidth: .infinity) }
+                    .glassButton()
+                Button { model.extend(by: 15) } label: { Text("+15 min").frame(maxWidth: .infinity) }
+                    .glassButton()
+                Button { model.cancel() } label: { Text("Cancel").frame(maxWidth: .infinity) }
+                    .glassButton(prominent: true)
                     .keyboardShortcut(.cancelAction)
             }
             .controlSize(.large)
+            .glassGroup(spacing: 8)
         }
     }
 
     private var setup: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Picker("Duration", selection: $model.minutes) {
-                ForEach(presets, id: \.self) { Text("\($0)").tag($0) }
+        VStack(spacing: 14) {
+            // Big duration readout with − / + around it.
+            HStack {
+                Button { model.minutes = max(5, model.minutes - 5) } label: {
+                    Image(systemName: "minus").frame(width: 20, height: 20)
+                }
+                .glassButton()
+                .buttonBorderShape(.circle)
+                Spacer()
+                VStack(spacing: 0) {
+                    Text("\(model.minutes)")
+                        .font(.system(size: 52, weight: .thin, design: .rounded).monospacedDigit())
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: model.minutes)
+                    Text("minutes").font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button { model.minutes = min(600, model.minutes + 5) } label: {
+                    Image(systemName: "plus").frame(width: 20, height: 20)
+                }
+                .glassButton()
+                .buttonBorderShape(.circle)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .controlSize(.large)
 
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                    Text("Duration").gridColumnAlignment(.trailing)
-                    HStack(spacing: 4) {
-                        TextField("", value: $model.minutes, format: .number)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 48)
-                        Stepper("", value: $model.minutes, in: 1...600, step: 5).labelsHidden()
-                        Text("min").foregroundStyle(.secondary)
+            // Presets: two even rows of three.
+            Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                ForEach(0..<2) { row in
+                    GridRow {
+                        ForEach(presets[row * 3 ..< row * 3 + 3], id: \.self) { p in
+                            Button { model.minutes = p } label: {
+                                Text(p < 60 ? "\(p) min" : p % 60 == 0 ? "\(p / 60) h" : "\(p / 60) h \(p % 60)")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .glassButton(prominent: model.minutes == p)
+                        }
                     }
                 }
+            }
+            .glassGroup(spacing: 8)
+
+            Divider()
+
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     Text("When done")
                     Picker("", selection: $model.action) {
@@ -258,7 +308,6 @@ struct ContentView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .fixedSize()
                 }
                 GridRow {
                     Text("Wake me at")
@@ -279,7 +328,7 @@ struct ContentView: View {
             } label: {
                 Text("Start").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .glassButton(prominent: true)
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
         }
@@ -287,7 +336,7 @@ struct ContentView: View {
 }
 
 @main
-struct MiracleSleeperApp: App {
+struct ParasomniaApp: App {
     @StateObject private var model = TimerModel()
 
     var body: some Scene {
