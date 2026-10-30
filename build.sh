@@ -1,9 +1,10 @@
 #!/bin/zsh
 set -e
 cd "$(dirname "$0")"
-APP="The Miracle and the Sleeper.app"
+FINAL="The Miracle and the Sleeper.app"
 BUILD=.build
-rm -rf "$APP" $BUILD
+APP="$BUILD/$FINAL"  # assemble here, move into place when complete
+rm -rf $BUILD
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" $BUILD
 for arch in arm64 x86_64; do
   swiftc -O -parse-as-library -target $arch-apple-macos13.0 SleepTimer.swift -o $BUILD/MiracleSleeper-$arch
@@ -14,4 +15,6 @@ $BUILD/makeicon $BUILD/AppIcon.iconset
 iconutil -c icns $BUILD/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 cp Info.plist "$APP/Contents/"
 codesign --force --sign - "$APP"
-echo "Built $PWD/$APP"
+rm -rf "$FINAL"
+mv "$APP" "$FINAL"
+echo "Built $PWD/$FINAL"
